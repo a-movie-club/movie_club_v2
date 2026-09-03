@@ -190,6 +190,12 @@ finish() {
 # `supabase db reset --linked`, which would destroy v1.
 
 TOTAL_STAGES=11
+
+# All outputs (.env.local, backups/, the results file) are repo-root-relative,
+# wherever the script is launched from. The first real run was started from
+# scripts/ and scattered its artifacts there.
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+
 ENV_FILE=".env.local"
 
 PROJECT_REF="schtizxdezxteulbvynp"
@@ -321,9 +327,12 @@ if [[ "$V2_CODE" == "200" ]]; then
 elif grep -q 'PGRST106' /tmp/v2-probe.json; then
   warn "FAIL: the v2 schema is NOT in Exposed Schemas (PGRST106) — go back one stage and redo it."
   V2_VERDICT="FAIL — PGRST106, v2 not actually exposed"
-elif grep -q '42P01' /tmp/v2-probe.json; then
-  say "  ✓ v2 profile is served (schema reachable) and cannot see public.movies (42P01)"
-  V2_VERDICT="PASS — 42P01: schema reachable, v1 tables invisible"
+elif grep -qE 'PGRST205|42P01' /tmp/v2-probe.json; then
+  # PostgREST answers PGRST205 ("table not in schema cache") for a missing
+  # table in an exposed schema — confirmed on the real run; 42P01 kept for
+  # older PostgREST versions that pass the Postgres error through.
+  say "  ✓ v2 profile is served (schema reachable) and cannot see public.movies"
+  V2_VERDICT="PASS — schema reachable, v1 tables invisible (PGRST205/42P01)"
 else
   warn "Unexpected response (HTTP $V2_CODE): $(cat /tmp/v2-probe.json)"
   V2_VERDICT="UNCLEAR — HTTP $V2_CODE, see wizard output"
