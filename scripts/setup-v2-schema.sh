@@ -194,7 +194,7 @@ TOTAL_STAGES=11
 # All outputs (.env.local, backups/, the results file) are repo-root-relative,
 # wherever the script is launched from. The first real run was started from
 # scripts/ and scattered its artifacts there.
-cd "$(dirname "${BASH_SOURCE[0]}")/.."
+CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")/.."
 
 ENV_FILE=".env.local"
 
