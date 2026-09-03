@@ -1,0 +1,22 @@
+# Secrets and per-machine config. This repo is PUBLIC — these entries must
+# exist before anything below them ever does. (.env.example is the one
+# env file that belongs in git.)
+.env
+.env.*
+!.env.example
+.cursor/
+
+# Editor/agent scratch
+.claude/worktrees/
+*.local.md
+
+# Node
+node_modules/
+dist/
+
+# Supabase CLI scratch (supabase/.gitignore covers .temp; belt and braces)
+supabase/.temp/
+
+# One-off backups made by scripts/setup-v2-schema.sh — never commit a
+# production dump to a public repo.
+backups/
