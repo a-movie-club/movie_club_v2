@@ -201,6 +201,20 @@ RESULTS_FILE="wizard-results-issue-6.local.md"
 # reads to close ticket #6.
 record() { printf -- '- %s\n' "$1" >> "$RESULTS_FILE"; }
 
+# probe_movies BODY_FILE [extra curl args…] — GET v1's movies endpoint with the
+# public key, body to BODY_FILE, HTTP code to stdout. The shared probe behind
+# every isolation/regression check below.
+probe_movies() {
+  local body="$1"; shift
+  curl -s -o "$body" -w '%{http_code}' \
+    "$SUPA_URL/rest/v1/movies?select=*&limit=1" \
+    -H "apikey: $PUB_KEY" "$@"
+}
+
+# Every table v1 actually queries (grepped from ../movie-club/js .from() calls).
+# None of these may ever appear in v2's generated types.
+V1_TABLES='bracket|bracket_history|members|monthly_events|movies|poll_options|poll_votes|polls|ratings|rsvps|settings|watchlist'
+
 printf '# Wizard results — ticket #6 (v2 schema)\n\nRun: %s\n\n' "$(date '+%Y-%m-%d %H:%M')" > "$RESULTS_FILE"
 
 banner "v2 schema: create + expose (ticket #6)"
@@ -230,6 +244,7 @@ if ! command -v pg_dump >/dev/null 2>&1 && [[ ! -x /opt/homebrew/opt/libpq/bin/p
   fi
 fi
 PGDUMP="$(command -v pg_dump || echo /opt/homebrew/opt/libpq/bin/pg_dump)"
+PGRESTORE="$(command -v pg_restore || echo /opt/homebrew/opt/libpq/bin/pg_restore)"
 open_url "https://supabase.com/dashboard/project/${PROJECT_REF}/settings/database"
 step "Click 'Connect' (top of dashboard) if the URI isn't on this page."
 step "Copy the SESSION POOLER connection string (port 5432, IPv4-friendly —"
@@ -238,20 +253,31 @@ step "Replace [YOUR-PASSWORD] with the database password. If you don't have it,"
 step "there's a 'Reset database password' button on the Database settings page."
 ask_secret DB_URI "Paste the full postgresql:// URI (with password):"
 mkdir -p backups
-BACKUP="backups/public-$(date +%Y%m%d-%H%M%S).sql"
-say "Dumping schema 'public' (structure + data)…"
-"$PGDUMP" "$DB_URI" --schema=public --no-owner -f "$BACKUP"
-TABLES=$(grep -cE '^CREATE TABLE' "$BACKUP" || true)
+STAMP=$(date +%Y%m%d-%H%M%S)
+BACKUP="backups/public-$STAMP.dump"
+BACKUP_SQL="backups/public-$STAMP.sql"
+say "Dumping schema 'public' (structure + data, pg_restore-able custom format)…"
+"$PGDUMP" "$DB_URI" --schema=public --no-owner -Fc -f "$BACKUP"
+say "Verifying it restores: decoding the whole archive back to plain SQL."
+note "(A live restore rehearsal needs a second database, which this project"
+note "doesn't have — a full pg_restore decode is the strongest check available.)"
+DATA_SECTIONS=$("$PGRESTORE" --list "$BACKUP" | grep -c 'TABLE DATA' || true)
+"$PGRESTORE" -f "$BACKUP_SQL" "$BACKUP"
+TABLES=$(grep -cE '^CREATE TABLE' "$BACKUP_SQL" || true)
 SIZE=$(du -h "$BACKUP" | cut -f1)
-say "Wrote $BACKUP ($SIZE, $TABLES tables)."
-grep -E '^CREATE TABLE' "$BACKUP" | sed 's/^/    /'
-say "Sanity-read it: those should be v1's tables (movies, etc.), with INSERTs below."
-if ! confirm "Does the dump look complete?"; then
+say "Wrote $BACKUP ($SIZE) — $TABLES tables, $DATA_SECTIONS data sections."
+grep -E '^CREATE TABLE' "$BACKUP_SQL" | sed 's/^/    /'
+say "Those should be all of v1's tables (movies, ratings, polls, …)."
+if [[ "$TABLES" -eq 0 || "$DATA_SECTIONS" -eq 0 ]]; then
+  warn "Empty or structure-only dump — do not proceed."
+  exit 1
+fi
+if ! confirm "Does the table list look complete?"; then
   warn "Stopping — do not proceed on a bad backup."
   exit 1
 fi
 note "backups/ is gitignored; a production dump must never reach the public repo."
-record "Backup: $BACKUP ($SIZE, $TABLES tables), verified readable"
+record "Backup: $BACKUP ($SIZE, $TABLES tables, $DATA_SECTIONS TABLE DATA sections; archive decoded end-to-end by pg_restore — live restore rehearsal impossible without a second database)"
 
 # ── 3 ─────────────────────────────────────────────────────────────────────
 stage "Link this repo to the shared project"
@@ -287,31 +313,39 @@ record "v2 added to Exposed schemas (public left in place)"
 
 # ── 6 ─────────────────────────────────────────────────────────────────────
 stage "Verify schema isolation, both directions"
-say "1/3 — a v2-profile client must NOT see v1's tables:"
-V2_MOVIES=$(curl -s -o /dev/null -w '%{http_code}' \
-  "$SUPA_URL/rest/v1/movies?select=*&limit=1" \
-  -H "apikey: $PUB_KEY" -H "Accept-Profile: v2")
-if [[ "$V2_MOVIES" == "200" ]]; then
+say "1/3 — a v2-profile client must reach the schema but NOT see v1's tables:"
+V2_CODE=$(probe_movies /tmp/v2-probe.json -H "Accept-Profile: v2")
+if [[ "$V2_CODE" == "200" ]]; then
   warn "FAIL: 'movies' is reachable through the v2 profile (HTTP 200). Isolation is broken — investigate before continuing."
+  V2_VERDICT="FAIL — HTTP 200, v1 table visible through v2 profile"
+elif grep -q 'PGRST106' /tmp/v2-probe.json; then
+  warn "FAIL: the v2 schema is NOT in Exposed Schemas (PGRST106) — go back one stage and redo it."
+  V2_VERDICT="FAIL — PGRST106, v2 not actually exposed"
+elif grep -q '42P01' /tmp/v2-probe.json; then
+  say "  ✓ v2 profile is served (schema reachable) and cannot see public.movies (42P01)"
+  V2_VERDICT="PASS — 42P01: schema reachable, v1 tables invisible"
 else
-  say "  ✓ v2 profile cannot reach public.movies (HTTP $V2_MOVIES)"
+  warn "Unexpected response (HTTP $V2_CODE): $(cat /tmp/v2-probe.json)"
+  V2_VERDICT="UNCLEAR — HTTP $V2_CODE, see wizard output"
 fi
 say "2/3 — the default profile must still serve v1:"
-V1_MOVIES=$(curl -s -o /dev/null -w '%{http_code}' \
-  "$SUPA_URL/rest/v1/movies?select=*&limit=1" -H "apikey: $PUB_KEY")
+V1_MOVIES=$(probe_movies /dev/null)
 if [[ "$V1_MOVIES" == "200" ]]; then
   say "  ✓ public.movies still served on the default profile (HTTP 200)"
 else
   warn "FAIL: v1's movies endpoint returned HTTP $V1_MOVIES — v1 may be broken, investigate NOW."
 fi
-say "3/3 — generated types for --schema v2 must contain no v1 tables:"
+say "3/3 — generated types for --schema v2 must contain none of v1's 12 tables:"
 npx supabase gen types typescript --linked --schema v2 > /tmp/v2-database.types.ts
-if grep -q 'movies' /tmp/v2-database.types.ts; then
-  warn "FAIL: v1 tables leaked into the v2 types — the whole point of the schema. Investigate."
+if grep -qwE "($V1_TABLES)" /tmp/v2-database.types.ts; then
+  warn "FAIL: v1 tables leaked into the v2 types — the whole point of the schema. Investigate:"
+  grep -woE "($V1_TABLES)" /tmp/v2-database.types.ts | sort -u | sed 's/^/    /'
+  TYPES_VERDICT="FAIL — v1 table names present"
 else
   say "  ✓ gen types --schema v2 emits only v2 (currently empty) — no v1 leakage"
+  TYPES_VERDICT="PASS — none of v1's 12 table names present"
 fi
-record "Isolation: v2 profile→public.movies HTTP $V2_MOVIES (expect non-200); default profile→movies HTTP $V1_MOVIES (expect 200); gen types v2 clean of v1 tables"
+record "Isolation: v2 profile $V2_VERDICT · default profile→movies HTTP $V1_MOVIES (expect 200) · gen types --schema v2: $TYPES_VERDICT"
 
 # ── 7 ─────────────────────────────────────────────────────────────────────
 stage "Google OAuth provider"
@@ -343,8 +377,7 @@ record "Email magic link: enabled; 'Allow new users to sign up': OFF (enable_sig
 # ── 9 ─────────────────────────────────────────────────────────────────────
 stage "Confirm v1 is undisturbed"
 say "Auth changes apply project-wide, so prove the live site still works anonymously."
-V1_CHECK=$(curl -s -o /dev/null -w '%{http_code}' \
-  "$SUPA_URL/rest/v1/movies?select=*&limit=1" -H "apikey: $PUB_KEY")
+V1_CHECK=$(probe_movies /dev/null)
 if [[ "$V1_CHECK" == "200" ]]; then
   say "  ✓ anonymous read on public.movies still works (HTTP 200)"
 else
