@@ -6,6 +6,9 @@
 !.env.example
 .cursor/
 
+# macOS
+.DS_Store
+
 # Editor/agent scratch
 .claude/worktrees/
 *.local.md
