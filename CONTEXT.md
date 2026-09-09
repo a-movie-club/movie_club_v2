@@ -52,6 +52,18 @@ there is no such thing as a Member who exists only as a name on old Ratings.
 A Member is identified by identity, never by display name — renaming a Member
 must not disturb their Ratings.
 
+## Admin
+
+The Member who curates — the one who admits people to the club and owns the
+calendar. Admin is a *capacity a Member has*, not a separate kind of person:
+an Admin is a Member who also rates films, and the club has always had one.
+
+An Admin does not stand above the club's record. They may remove a Rating, but
+never change one — a score belongs to the Member who gave it.
+
+Distinct from v1's "admin login", which was a password in the page source that
+gated a form and nothing else.
+
 ## Rating
 
 One Member's score for one Movie, from 0 to 5, revisable. A Rating attaches to
