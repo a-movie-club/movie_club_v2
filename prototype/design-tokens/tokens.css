@@ -1,0 +1,79 @@
+/*
+ * Proposed shadcn-compatible token set for movie_club_v2.
+ *
+ * Components consume semantic tokens only. The brand primitives below are
+ * centralized here so a future no-raw-colors lint rule has one narrow escape
+ * hatch. v1's ACCENT_COLORS array is intentionally absent: those colors were
+ * per-movie data, and that concept is retired in v2.
+ */
+
+:root {
+  color-scheme: light;
+
+  --brand-ink: #12101e;
+  --brand-paper: #f0ead6;
+  --brand-cream: #eeeadc;
+  --brand-yellow: #f5c518;
+  --brand-blue: #8ec5e6;
+  --brand-blue-deep: #2a6a8a;
+  --brand-red: #c0392b;
+  --brand-green: #278a53;
+
+  --background: var(--brand-paper);
+  --foreground: var(--brand-ink);
+  --card: #ffffff;
+  --card-foreground: var(--brand-ink);
+  --popover: #ffffff;
+  --popover-foreground: var(--brand-ink);
+  --primary: var(--brand-ink);
+  --primary-foreground: #f7f5f2;
+  --secondary: var(--brand-cream);
+  --secondary-foreground: var(--brand-ink);
+  --muted: var(--brand-cream);
+  --muted-foreground: #6f6759;
+  --accent: var(--brand-yellow);
+  --accent-foreground: var(--brand-ink);
+  --destructive: var(--brand-red);
+  --destructive-foreground: #ffffff;
+  --success: var(--brand-green);
+  --success-foreground: #ffffff;
+  --border: var(--brand-blue);
+  --input: var(--brand-blue);
+  --ring: var(--brand-blue-deep);
+  --radius: 0.625rem;
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", sans-serif;
+  --font-sans-legacy: Calibri, Candara, "Segoe UI", Optima, sans-serif;
+  --font-logo-fallback: Georgia, Cambria, "Times New Roman", serif;
+}
+
+.dark {
+  color-scheme: dark;
+
+  --background: #0e0c16;
+  --foreground: #d8d3ee;
+  --card: #15132a;
+  --card-foreground: #eeeaf7;
+  --popover: #15132a;
+  --popover-foreground: #eeeaf7;
+  --primary: var(--brand-yellow);
+  --primary-foreground: var(--brand-ink);
+  --secondary: #24213a;
+  --secondary-foreground: #eeeaf7;
+  --muted: #24213a;
+  --muted-foreground: #aaa4bd;
+  --accent: var(--brand-yellow);
+  --accent-foreground: var(--brand-ink);
+  --destructive: #e46a60;
+  --destructive-foreground: #0e0c16;
+  --success: #4bc47d;
+  --success-foreground: #0e0c16;
+  --border: #4d6f86;
+  --input: #3b5266;
+  --ring: var(--brand-blue);
+}
+
+[data-font="legacy"] {
+  --font-sans: var(--font-sans-legacy);
+}

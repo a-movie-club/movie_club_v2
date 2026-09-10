@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>Movie Club v2 — token prototype</title>
+    <link rel="stylesheet" href="./tokens.css" />
+    <link rel="stylesheet" href="./prototype.css" />
+  </head>
+  <body>
+    <!--
+      Three token contexts, switchable via ?variant=, on this throwaway
+      /prototype/design-tokens page. There is no app route to host it yet.
+    -->
+    <header class="site-header">
+      <a class="brand" href="?variant=A" aria-label="Movie Club prototype home">
+        <span class="brand-mark" aria-hidden="true">
+          <span>movie</span>
+          <span>club</span>
+        </span>
+        <span class="brand-copy">
+          <strong>Movie Club</strong>
+          <small>design-token field test</small>
+        </span>
+      </a>
+      <div class="header-actions">
+        <button class="button button-secondary" id="font-toggle" type="button">
+          Font: system
+        </button>
+        <button class="button button-primary" id="theme-toggle" type="button">
+          Dark mode
+        </button>
+      </div>
+    </header>
+
+    <main id="app" tabindex="-1"></main>
+
+    <aside class="prototype-state" aria-live="polite">
+      <span>PROTOTYPE</span>
+      <code id="state-readout"></code>
+    </aside>
+
+    <nav class="prototype-switcher" aria-label="Prototype specimens">
+      <button id="previous-variant" type="button" aria-label="Previous specimen">←</button>
+      <span id="variant-label"></span>
+      <button id="next-variant" type="button" aria-label="Next specimen">→</button>
+    </nav>
+
+    <script src="./prototype.js"></script>
+  </body>
+</html>
